@@ -14,7 +14,8 @@ public class MainBaseLineIEEE {
 		int upper_k =7000;
 		int lower_k =5000;
 		for (int l = 0; l < 1; l++) {
-			System.out.println("k: "+k);
+			System.out.println("upper_k: "+upper_k);
+			System.out.println("lower_k: "+lower_k);
 			// the number of updates to be performed
 			int numberOfUpdates = 9;
 
@@ -48,7 +49,8 @@ public class MainBaseLineIEEE {
 				lastLine = firstLine+linesForeEachUpdate;
 
 			}
-			k -= 500;
+			upper_k -= 500;
+			lower_k -= 500;
 
 		}
 	}
