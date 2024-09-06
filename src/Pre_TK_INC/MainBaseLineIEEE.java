@@ -11,8 +11,8 @@ public class MainBaseLineIEEE {
 
 		String input ="retail.txt";
 		String output = "output.txt";
-		int upper_k =7000;
-		int lower_k =5000;
+		int upper_k = 7000;
+		int lower_k = 5000;
 		for (int l = 0; l < 1; l++) {
 			System.out.println("upper_k: "+upper_k);
 			System.out.println("lower_k: "+lower_k);

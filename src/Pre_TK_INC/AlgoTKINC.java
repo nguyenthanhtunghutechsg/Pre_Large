@@ -82,8 +82,7 @@ public class AlgoTKINC {
     /**
      * Priority queue to store the top k patterns
      */
-    PriorityQueue<PatternTHUI> k_Large_Patterns;
-    PriorityQueue<PatternTHUI> k_Pre_Large_Patterns;
+    PriorityQueue<PatternTHUI> k_Pre_Large_And_Large_Patterns;
     PriorityQueue<Long> leafPruneUtils = null;
 
     final int BUFFERS_SIZE = 200;
@@ -101,7 +100,6 @@ public class AlgoTKINC {
     private StringBuilder buffer = new StringBuilder(32);
 
     Map<Integer, Map<Integer, Long>> mapLeafMAP = null;
-    int leafMapSize = 0;
 
     List<Node> singleItemsNodes;
 
@@ -193,8 +191,7 @@ public class AlgoTKINC {
             mapItemToRank = new HashMap<>();
             singleItemsNodes = new ArrayList<>();
             totalDBUtility_OD = 0;
-            k_Large_Patterns = new PriorityQueue<>();
-            k_Pre_Large_Patterns = new PriorityQueue<>();
+            k_Pre_Large_And_Large_Patterns = new PriorityQueue<>();
         }
         minUtility_lower = 0;
         minUtility_upper = 0;
@@ -207,7 +204,7 @@ public class AlgoTKINC {
         String thisLine;
         huiCount = 0;
         List<UtilityList> newItemsUtilityLists = new ArrayList<UtilityList>();
-
+        List<List<Pair>> newTrans = new ArrayList<>();
         try {
             int tid = 1;
             myInput = new BufferedReader(new InputStreamReader(new FileInputStream(new File(input))));
@@ -221,12 +218,15 @@ public class AlgoTKINC {
                     String items[] = split[0].split(" ");
                     String utilityValues[] = split[2].split(" ");
                     int transactionUtility = Integer.parseInt(split[1]);
+                    List<Pair> transaction = new ArrayList<>();
                     for (int i = 0; i < items.length; i++) {
                         Integer item = Integer.parseInt(items[i]);
                         int util = Integer.parseInt(utilityValues[i]);
                         Integer twu = mapItemToTWU.get(item);
                         Long sumUtil = mapItemToUtility.get(item);
                         Element element = new Element(tid, util, 0);
+                        Pair pair = new Pair(item,util);
+                        transaction.add(pair);
                         if (twu == null) {
                             twu = transactionUtility;
                             sumUtil = (long) util;
@@ -245,8 +245,9 @@ public class AlgoTKINC {
                         mapItemToUtility.put(item, sumUtil);
                     }
                     totalDBUtility_ID += transactionUtility;
-                    tid++;
+                    newTrans.add(transaction);
                 }
+                tid++;
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -255,8 +256,6 @@ public class AlgoTKINC {
                 myInput.close();
             }
         }
-
-
         raisingThresholdByUtilityOfSingleItem(mapItemToUtility, upper_topkstatic,lower_topkstatic);
 
         newItemsUtilityLists.sort(new Comparator<UtilityList>() {
@@ -272,45 +271,14 @@ public class AlgoTKINC {
             listOfUtilityLists.add(list);
         }
         listOfUtilityLists.sort(new UtilComparator());
-        try {
-            myInput = new BufferedReader(new InputStreamReader(new FileInputStream(new File(input))));
-            int tid = firstLine;
-            while ((thisLine = myInput.readLine()) != null && tid < lastLine) {
-                if (thisLine.isEmpty() == true || thisLine.charAt(0) == '#' || thisLine.charAt(0) == '%'
-                        || thisLine.charAt(0) == '@') {
-                    continue;
-                }
-                String split[] = thisLine.split(":");
-                String items[] = split[0].split(" ");
-                String utilityValues[] = split[2].split(" ");
-
-                List<Pair> revisedTransaction = new ArrayList<>();
-                for (int i = 0; i < items.length; i++) {
-                    Pair pair = new Pair(Integer.parseInt(items[i]), Integer.parseInt(utilityValues[i]));
-                    revisedTransaction.add(pair);
-                }
-                Collections.sort(revisedTransaction, new PairComparator());
-                for (int i = revisedTransaction.size() - 1; i >= 0; i--) {
-                    Pair pair = revisedTransaction.get(i);
-                    updateLeafprune(i, pair, revisedTransaction, listOfUtilityLists);
-                }
-                tid++;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (myInput != null) {
-                myInput.close();
+        for (List<Pair> revisedTransaction : newTrans) {
+            Collections.sort(revisedTransaction, new PairComparator());
+            for (int i = revisedTransaction.size() - 1; i >= 0; i--) {
+                Pair pair = revisedTransaction.get(i);
+                updateLeafprune(i, pair, revisedTransaction, listOfUtilityLists);
             }
         }
-
-//		if (EUCS_PRUNE) {
-//			raisingThresholdCUDOptimize(topkstatic);
-//			removeEntry();
-//		}
         raisingThresholdLeaf(listOfUtilityLists);
-        setLeafMapSize();
-        //removeLeafEntry();
         leafPruneUtils = null;
         List<UtilityList> listOfPromisingUtilityLists = new ArrayList<>();
         for (Entry<Integer, UtilityList> entry : mapItemToUtilityList.entrySet()) {
@@ -319,7 +287,7 @@ public class AlgoTKINC {
             }
         }
         Collections.sort(listOfPromisingUtilityLists, new UtilComparator());
-        int arrayRu[] = new int[tid + 1];
+        int arrayRu[] = new int[lastLine + 1];
         for (int i = listOfPromisingUtilityLists.size() - 1; i >= 0; i--) {
             UtilityList ul = listOfPromisingUtilityLists.get(i);
             int newRemain = 0;
@@ -333,35 +301,38 @@ public class AlgoTKINC {
         }
         checkMemory();
         thui(itemsetBuffer, 0, null, listOfPromisingUtilityLists);
+        totalDBUtility_OD+=totalDBUtility_ID;
+        totalDBUtility_ID =0;
+        System.out.println("Remine");
         checkMemory();
 
         writeResultTofile();
         writer.close();
 
         endTimestamp = System.currentTimeMillis();
-        kPatterns.clear();
+        //kPatterns.clear();
 
     }
 
-    public void updateEUCSprune(int i, Pair pair, List<Pair> revisedTransaction, long newTWU) {
-
-        Map<Integer, ItemTHUI> mapFMAPItem = mapFMAP.get(pair.item);
-        if (mapFMAPItem == null) {
-            mapFMAPItem = new HashMap<Integer, ItemTHUI>();
-            mapFMAP.put(pair.item, mapFMAPItem);
-        }
-        for (int j = i + 1; j < revisedTransaction.size(); j++) {
-            if (pair.item == revisedTransaction.get(j).item)
-                continue;// kosarak dataset has duplicate items
-            Pair pairAfter = revisedTransaction.get(j);
-            ItemTHUI twuItem = mapFMAPItem.get(pairAfter.item);
-            if (twuItem == null)
-                twuItem = new ItemTHUI();
-            twuItem.twu += newTWU;
-            twuItem.utility += (long) pair.utility + pairAfter.utility;
-            mapFMAPItem.put(pairAfter.item, twuItem);
-        }
-    }
+//    public void updateEUCSprune(int i, Pair pair, List<Pair> revisedTransaction, long newTWU) {
+//
+//        Map<Integer, ItemTHUI> mapFMAPItem = mapFMAP.get(pair.item);
+//        if (mapFMAPItem == null) {
+//            mapFMAPItem = new HashMap<Integer, ItemTHUI>();
+//            mapFMAP.put(pair.item, mapFMAPItem);
+//        }
+//        for (int j = i + 1; j < revisedTransaction.size(); j++) {
+//            if (pair.item == revisedTransaction.get(j).item)
+//                continue;// kosarak dataset has duplicate items
+//            Pair pairAfter = revisedTransaction.get(j);
+//            ItemTHUI twuItem = mapFMAPItem.get(pairAfter.item);
+//            if (twuItem == null)
+//                twuItem = new ItemTHUI();
+//            twuItem.twu += newTWU;
+//            twuItem.utility += (long) pair.utility + pairAfter.utility;
+//            mapFMAPItem.put(pairAfter.item, twuItem);
+//        }
+//    }
 
     public void updateLeafprune(int i, Pair pair, List<Pair> revisedTransaction, List<UtilityList> ULs) {
 
@@ -395,54 +366,45 @@ public class AlgoTKINC {
         return -1;
     }
 
-    public void setLeafMapSize() {
-        for (Entry<Integer, Map<Integer, Long>> entry : mapLeafMAP.entrySet())
-            leafMapSize += entry.getValue().keySet().size();
-    }
-
     private int compareItems(int item1, int item2) {
         int compare = (int) (mapItemToTWU.get(item1) - mapItemToTWU.get(item2));
         return (compare == 0) ? item1 - item2 : compare;
     }
 
-    public void writeResultTofileUnord() throws IOException {
-
-        Iterator<PatternTHUI> iter = kPatterns.iterator();
-        while (iter.hasNext()) {
-            huiCount++; // increase the number of high utility itemsets found
-            PatternTHUI pattern = (PatternTHUI) iter.next();
-            StringBuilder buffer = new StringBuilder();
-            buffer.append(pattern.prefix.toString());
-            // write separator
-            buffer.append(" #UTIL: ");
-            // write support
-            buffer.append(pattern.utility);
-            writer.write(buffer.toString());
-            writer.newLine();
-        }
-        writer.close();
-    }
+//    public void writeResultTofileUnord() throws IOException {
+//
+//        Iterator<PatternTHUI> iter = k_Pre_Large_And_Large_Patterns.iterator();
+//        while (iter.hasNext()) {
+//            huiCount++; // increase the number of high utility itemsets found
+//            PatternTHUI pattern = (PatternTHUI) iter.next();
+//            StringBuilder buffer = new StringBuilder();
+//            buffer.append(pattern.prefix.toString());
+//            // write separator
+//            buffer.append(" #UTIL: ");
+//            // write support
+//            buffer.append(pattern.utility);
+//            writer.write(buffer.toString());
+//            writer.newLine();
+//        }
+//        writer.close();
+//    }
 
     private void thui(int[] prefix, int prefixLength, UtilityList pUL, List<UtilityList> ULs) throws IOException {
 
         for (int i = ULs.size() - 1; i >= 0; i--) {
-            if (ULs.get(i).getUtils() >= minUtility)
+            UtilityList X = ULs.get(i);
+            long utilityOfX = X.sumIutils;
+            if (X.getUtils() >= minUtility_lower){
+                //insertHUIinTrie(prefix, prefixLength, X.item, utilityOfX);
                 save(prefix, prefixLength, ULs.get(i));
+            }
+                //save(prefix, prefixLength, ULs.get(i));
         }
 
         for (int i = ULs.size() - 2; i >= 0; i--) {// last item is a single item, and hence no extension
             checkMemory();
             UtilityList X = ULs.get(i);
-            if (X.sumIutils + X.sumRutils >= minUtility && X.sumIutils > 0) {// the utility value of zero cases can be
-                // safely ignored, as it is unlikely to
-                // generate a HUI; besides the lowest
-                // min utility will be 1
-//				if (EUCS_PRUNE) {
-//					Map<Integer, ItemTHUI> mapTWUF = mapFMAP.get(X.item);
-//					if (mapTWUF == null)
-//						continue;
-//				}
-
+            if (X.sumIutils + X.sumRutils >= minUtility_lower && X.sumIutils > 0) {// the utility value of zero cases can be
                 List<UtilityList> exULs = new ArrayList<UtilityList>();
                 for (int j = i + 1; j < ULs.size(); j++) {
                     UtilityList Y = ULs.get(j);
@@ -480,7 +442,7 @@ public class AlgoTKINC {
             } // px not present, py pres
             if (px.elements.get(ei).tid < py.elements.get(ej).tid) {// px present, py not present
                 totUtil = totUtil - px.elements.get(ei).iutils - px.elements.get(ei).rutils;
-                if (totUtil < minUtility) {
+                if (totUtil < minUtility_lower) {
                     return null;
                 }
                 ++ei;
@@ -505,7 +467,7 @@ public class AlgoTKINC {
         }
         while (ei < px.elements.size()) {
             totUtil = totUtil - px.elements.get(ei).iutils - px.elements.get(ei).rutils;
-            if (totUtil < minUtility) {
+            if (totUtil < minUtility_lower) {
                 return null;
             }
             ++ei;
@@ -515,15 +477,15 @@ public class AlgoTKINC {
 
     public void writeResultTofile() throws IOException {
 
-        if (kPatterns.size() == 0)
+        if (k_Pre_Large_And_Large_Patterns.size() == 0)
             return;
         List<PatternTHUI> lp = new ArrayList<PatternTHUI>();
         do {
             huiCount++;
-            PatternTHUI pattern = kPatterns.poll();
+            PatternTHUI pattern = k_Pre_Large_And_Large_Patterns.poll();
 
             lp.add(pattern);
-        } while (kPatterns.size() > 0);
+        } while (k_Pre_Large_And_Large_Patterns.size() > 0);
 
         Collections.sort(lp, new Comparator<PatternTHUI>() {
             public int compare(PatternTHUI o1, PatternTHUI o2) {
@@ -565,15 +527,6 @@ public class AlgoTKINC {
         oos.close();
         double maxMemory = baos.size() / 1024d / 1024d;
         return maxMemory;
-    }
-
-    public int getMax(Map<Integer, Integer> map) {
-        int r = 0;
-        for (Integer value : map.values()) {
-            if (value >= minUtility)
-                r++;
-        }
-        return r;
     }
 
     public void raisingThresholdByUtilityOfSingleItem(Map<Integer, Long> map, int k_upper, int k_lower) {
@@ -680,41 +633,41 @@ public class AlgoTKINC {
             minUtility_lower = leafPruneUtils.peek();
         do {
             leafPruneUtils.poll();
-        } while (leafPruneUtils.size() > upper_topkstatic);
+        } while (leafPruneUtils.size() > lower_topkstatic);
         minUtility_upper = leafPruneUtils.peek();
 
     }
 
-    private void removeEntry() {
-        for (Entry<Integer, Map<Integer, ItemTHUI>> entry : mapFMAP.entrySet()) {
-            for (Iterator<Entry<Integer, ItemTHUI>> it = entry.getValue().entrySet().iterator(); it.hasNext(); ) {
-                Entry<Integer, ItemTHUI> entry2 = it.next();
-                if (entry2.getValue().twu < minUtility) {
-                    it.remove();
-                }
-            }
-        }
-    }
-
-    private void removeLeafEntry() {
-        for (Entry<Integer, Map<Integer, Long>> entry : mapLeafMAP.entrySet()) {
-            for (Iterator<Entry<Integer, Long>> it = entry.getValue().entrySet().iterator(); it.hasNext(); ) {
-                Entry<Integer, Long> entry2 = it.next();
-                it.remove();
-            }
-        }
-    }
+//    private void removeEntry() {
+//        for (Entry<Integer, Map<Integer, ItemTHUI>> entry : mapFMAP.entrySet()) {
+//            for (Iterator<Entry<Integer, ItemTHUI>> it = entry.getValue().entrySet().iterator(); it.hasNext(); ) {
+//                Entry<Integer, ItemTHUI> entry2 = it.next();
+//                if (entry2.getValue().twu < minUtility) {
+//                    it.remove();
+//                }
+//            }
+//        }
+//    }
+//
+//    private void removeLeafEntry() {
+//        for (Entry<Integer, Map<Integer, Long>> entry : mapLeafMAP.entrySet()) {
+//            for (Iterator<Entry<Integer, Long>> it = entry.getValue().entrySet().iterator(); it.hasNext(); ) {
+//                Entry<Integer, Long> entry2 = it.next();
+//                it.remove();
+//            }
+//        }
+//    }
 
     private void save(int[] prefix, int length, UtilityList X) {
 
-        kPatterns.add(new PatternTHUI(prefix, length, X, candidateCount));
-        if (kPatterns.size() > topkstatic) {
-            if (X.getUtils() >= minUtility) {
+        k_Pre_Large_And_Large_Patterns.add(new PatternTHUI(prefix, length, X, candidateCount));
+        if (k_Pre_Large_And_Large_Patterns.size() > upper_topkstatic) {
+            if (X.getUtils() >= minUtility_lower) {
                 do {
-                    kPatterns.poll();
-                } while (kPatterns.size() > topkstatic);
+                    k_Pre_Large_And_Large_Patterns.poll();
+                } while (k_Pre_Large_And_Large_Patterns.size() > upper_topkstatic);
             }
-            minUtility = kPatterns.peek().utility;
+            minUtility_lower = k_Pre_Large_And_Large_Patterns.peek().utility;
         }
     }
 
@@ -731,7 +684,8 @@ public class AlgoTKINC {
         System.out.println(" Total time ~ " + (endTimestamp - startTimestamp) + " ms");
         System.out.println(" Memory ~ " + df.format(maxMemory) + " MB");
         System.out.println(" High-utility itemsets count : " + huiCount + " Candidates " + candidateCount);
-        System.out.println(" Final minimum utility : " + minUtility);
+        System.out.println(" Final minimum utility upper : " + minUtility_upper);
+        System.out.println(" Final minimum utility lower : " + minUtility_lower);
         File f = new File(inputFile);
         String tmp = f.getName();
         tmp = tmp.substring(0, tmp.lastIndexOf('.'));
@@ -920,7 +874,7 @@ public class AlgoTKINC {
      * @param utility      the utility of the HUI
      * @param prefixLength The current prefix length
      */
-    public void insertHUIinTrie(int prefix[], int prefixLength, int lastitem, int utility) {
+    public void insertHUIinTrie(int prefix[], int prefixLength, int lastitem, long utility) {
         List<Node> listNodes = singleItemsNodes;
         Node currentNode = null;
 

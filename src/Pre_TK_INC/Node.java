@@ -10,7 +10,7 @@ public class Node {
     /** The list of child node */
     List<Node> childs = new ArrayList<Node>(3);
     /** A utility value stored in that node */
-    int utility = -1;
+    long utility = -1;
 
     /** The node constructor
      * @param item an item
@@ -24,7 +24,7 @@ public class Node {
      * @param item the item to store in that node
      * @param utility the utility to store in that node
      */
-    public Node(int item, int utility) {
+    public Node(int item, long utility) {
         this.item = item;
         this.utility = utility;
     }

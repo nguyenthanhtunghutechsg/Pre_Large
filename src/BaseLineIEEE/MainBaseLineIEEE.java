@@ -11,7 +11,7 @@ public class MainBaseLineIEEE {
 
 		String input ="retail.txt";
 		String output = "output.txt";
-		int k =5000;
+		int k =7000;
 		for (int l = 0; l < 1; l++) {
 			System.out.println("k: "+k);
 			// the number of updates to be performed
