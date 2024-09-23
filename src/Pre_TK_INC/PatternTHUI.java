@@ -18,26 +18,31 @@ package Pre_TK_INC;
 */
 public class PatternTHUI implements Comparable<PatternTHUI>{
 	
-	String prefix;
+	int[] prefix;
+	int item;
 	long utility;
 	int sup;
 	int idx;//for sorting patterns in order of insertion 
 	
-	public PatternTHUI(int[] prefix, int length, UtilityList X, int idx) {
-		String buffer = "";
-		for (int i = 0; i < length; i++) {
-			buffer += prefix[i];
-			buffer += " ";
-		}
-		buffer += "" +X.item;
-		this.prefix = buffer;
+	public PatternTHUI(int[] prefix, UtilityList X, int idx) {
+//		for (int i = 0; i < length; i++) {
+//			buffer += prefix[i];
+//			buffer += " ";
+//		}
+		item = X.item;
+		this.prefix = prefix;
 		this.idx = idx;
 		
 		this.utility = X.getUtils();
 		this.sup = X.elements.size();// + X.sup;//X.sup for closed items
 	}
+	public PatternTHUI(int[] prefix, int item, long utility) {
+		this.item = item;
+		this.prefix = prefix;
+		this.utility = utility;
+	}
 
-	public String getPrefix(){
+	public int[] getPrefix(){
 		return this.prefix;
 	}
 

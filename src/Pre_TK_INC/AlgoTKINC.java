@@ -85,8 +85,6 @@ public class AlgoTKINC {
     PriorityQueue<PatternTHUI> k_Pre_Large_And_Large_Patterns;
     PriorityQueue<Long> leafPruneUtils = null;
 
-    final int BUFFERS_SIZE = 200;
-    private int[] itemsetBuffer = null;
 
     /**
      * During first database, the item are sorted by TWU.... Then we keep this ordering
@@ -148,15 +146,17 @@ public class AlgoTKINC {
     int firstLine;
     Map<Integer, Long> mapItemToUtility;
 
+
     /**
      * This is the total utility of all transactions in Incremental Database
      */
-    int totalDBUtility_ID;
+    long totalDBUtility_ID;
     /**
      * This is the total utility of all transactions in Original Database
      */
-    int totalDBUtility_OD;
-
+    long totalDBUtility_OD;
+    long minUtility_upper_previous = 0;
+    long minUtility_lower_previous = 0;
     /**
      * Run the algorithm
      *
@@ -173,7 +173,6 @@ public class AlgoTKINC {
         lower_topkstatic = lower_top_k;
 
         maxMemory = 0;
-        itemsetBuffer = new int[BUFFERS_SIZE];
 
         this.firstLine = firstLine;
         inputFile = input;
@@ -191,8 +190,8 @@ public class AlgoTKINC {
             mapItemToRank = new HashMap<>();
             singleItemsNodes = new ArrayList<>();
             totalDBUtility_OD = 0;
-            k_Pre_Large_And_Large_Patterns = new PriorityQueue<>();
         }
+        k_Pre_Large_And_Large_Patterns = new PriorityQueue<>();
         minUtility_lower = 0;
         minUtility_upper = 0;
 
@@ -280,38 +279,91 @@ public class AlgoTKINC {
         }
         raisingThresholdLeaf(listOfUtilityLists);
         leafPruneUtils = null;
-        List<UtilityList> listOfPromisingUtilityLists = new ArrayList<>();
-        for (Entry<Integer, UtilityList> entry : mapItemToUtilityList.entrySet()) {
-            if (mapItemToTWU.get(entry.getKey()) >= minUtility_lower) {
-                listOfPromisingUtilityLists.add(entry.getValue());
-            }
-        }
-        Collections.sort(listOfPromisingUtilityLists, new UtilComparator());
-        int arrayRu[] = new int[lastLine + 1];
-        for (int i = listOfPromisingUtilityLists.size() - 1; i >= 0; i--) {
-            UtilityList ul = listOfPromisingUtilityLists.get(i);
-            int newRemain = 0;
-            for (int j = 0; j < ul.elements.size(); j++) {
-                Element element = ul.elements.get(j);
-                element.rutils = arrayRu[element.tid];
-                arrayRu[element.tid] += element.iutils;
-                newRemain += element.rutils;
-            }
-            ul.sumRutils = newRemain;
-        }
-        checkMemory();
-        thui(itemsetBuffer, 0, null, listOfPromisingUtilityLists);
-        totalDBUtility_OD+=totalDBUtility_ID;
-        totalDBUtility_ID =0;
-        System.out.println("Remine");
-        checkMemory();
 
-        writeResultTofile();
-        writer.close();
+        if(minUtility_upper<minUtility_upper_previous){
+            minUtility_upper = minUtility_upper_previous;
+        }
+        if(minUtility_lower<minUtility_lower_previous){
+            minUtility_lower = minUtility_lower_previous;
+        }
 
-        endTimestamp = System.currentTimeMillis();
+        boolean condition_Rescan = totalDBUtility_ID>(minUtility_upper-minUtility_lower);
+        System.out.println(totalDBUtility_ID);
+        System.out.println(minUtility_upper-minUtility_lower);
+        if(condition_Rescan||firstTime){
+            System.out.println("Remine");
+            List<UtilityList> listOfPromisingUtilityLists = new ArrayList<>();
+            for (Entry<Integer, UtilityList> entry : mapItemToUtilityList.entrySet()) {
+                if (mapItemToTWU.get(entry.getKey()) >= minUtility_lower) {
+                    listOfPromisingUtilityLists.add(entry.getValue());
+                }
+            }
+            Collections.sort(listOfPromisingUtilityLists, new UtilComparator());
+            int arrayRu[] = new int[lastLine + 1];
+            for (int i = listOfPromisingUtilityLists.size() - 1; i >= 0; i--) {
+                UtilityList ul = listOfPromisingUtilityLists.get(i);
+                int newRemain = 0;
+                for (int j = 0; j < ul.elements.size(); j++) {
+                    Element element = ul.elements.get(j);
+                    element.rutils = arrayRu[element.tid];
+                    arrayRu[element.tid] += element.iutils;
+                    newRemain += element.rutils;
+                }
+                ul.sumRutils = newRemain;
+            }
+            checkMemory();
+            thui(new int[0], null, listOfPromisingUtilityLists);
+            singleItemsNodes = new ArrayList<>();
+            while(k_Pre_Large_And_Large_Patterns.size()>0){
+                PatternTHUI hui = k_Pre_Large_And_Large_Patterns.poll();
+                if (k_Pre_Large_And_Large_Patterns.size()==(lower_top_k-1)){
+                    minUtility_upper = hui.utility;
+                }
+                insertHUIinTrie(hui.prefix, hui.prefix.length, hui.item, hui.utility);
+            }
+
+            totalDBUtility_OD+=totalDBUtility_ID;
+            totalDBUtility_ID =0;
+            minUtility_upper_previous = minUtility_upper;
+            minUtility_lower_previous = minUtility_lower;
+            checkMemory();
+
+            writeResultTofile();
+            writer.close();
+
+            endTimestamp = System.currentTimeMillis();
+        }else{
+            System.out.println("update");
+            for(List<Pair> transaction:newTrans){
+                UpdateTree(transaction);
+            }
+            checkMemory();
+            //printTrie();
+            InsertItemsetFromTreeToQueue(singleItemsNodes,new int[0]);
+            minUtility_lower = k_Pre_Large_And_Large_Patterns.peek().utility;
+            while(k_Pre_Large_And_Large_Patterns.size()>lower_top_k-1){
+                k_Pre_Large_And_Large_Patterns.poll();
+            }
+            minUtility_upper = k_Pre_Large_And_Large_Patterns.peek().utility;
+            minUtility_upper_previous = minUtility_upper;
+            minUtility_lower_previous = minUtility_lower;
+            endTimestamp = System.currentTimeMillis();
+        }
         //kPatterns.clear();
+    }
+    public void InsertItemsetFromTreeToQueue(List<Node> list, int prefix[]) {
+        for (Node node : list) {
+            if (node.utility!=-1){
+                PatternTHUI newPattern = new PatternTHUI(prefix,node.item,node.utility);
+                k_Pre_Large_And_Large_Patterns.add(newPattern);
+            }
 
+            int newPrefix[] = new int[prefix.length+1];
+            System.arraycopy(prefix, 0, newPrefix, 0, prefix.length);
+            newPrefix[prefix.length] = node.item;
+            // Make a recursive call to print childs of that node
+            InsertItemsetFromTreeToQueue(node.childs, newPrefix);
+        }
     }
 
 //    public void updateEUCSprune(int i, Pair pair, List<Pair> revisedTransaction, long newTWU) {
@@ -389,14 +441,14 @@ public class AlgoTKINC {
 //        writer.close();
 //    }
 
-    private void thui(int[] prefix, int prefixLength, UtilityList pUL, List<UtilityList> ULs) throws IOException {
+    private void thui(int[] prefix, UtilityList pUL, List<UtilityList> ULs) throws IOException {
 
         for (int i = ULs.size() - 1; i >= 0; i--) {
             UtilityList X = ULs.get(i);
             long utilityOfX = X.sumIutils;
             if (X.getUtils() >= minUtility_lower){
                 //insertHUIinTrie(prefix, prefixLength, X.item, utilityOfX);
-                save(prefix, prefixLength, ULs.get(i));
+                save(prefix, ULs.get(i));
             }
                 //save(prefix, prefixLength, ULs.get(i));
         }
@@ -414,8 +466,10 @@ public class AlgoTKINC {
                         exULs.add(exul);
 
                 }
-                prefix[prefixLength] = X.item;
-                thui(prefix, prefixLength + 1, X, exULs);
+                int newArray[] = new int[prefix.length+1];
+                System.arraycopy(prefix, 0, newArray, 0, prefix.length);
+                newArray[prefix.length] = X.item;
+                thui(newArray, X, exULs);
             }
         }
     }
@@ -508,8 +562,8 @@ public class AlgoTKINC {
     }
 
     private int comparePatterns(PatternTHUI item1, PatternTHUI item2) {
-        int i1 = (int) Integer.parseInt(item1.prefix.split(" ")[0]);
-        int i2 = (int) Integer.parseInt(item2.prefix.split(" ")[0]);
+        int i1 = item1.prefix.length==0?item1.item:item1.prefix[0];
+        int i2 = item2.prefix.length==0?item2.item:item2.prefix[0];
 
         int compare = (int) (mapItemToTWU.get(i1) - mapItemToTWU.get(i2));
         return compare;
@@ -658,9 +712,9 @@ public class AlgoTKINC {
 //        }
 //    }
 
-    private void save(int[] prefix, int length, UtilityList X) {
+    private void save(int[] prefix, UtilityList X) {
 
-        k_Pre_Large_And_Large_Patterns.add(new PatternTHUI(prefix, length, X, candidateCount));
+        k_Pre_Large_And_Large_Patterns.add(new PatternTHUI(prefix, X, candidateCount));
         if (k_Pre_Large_And_Large_Patterns.size() > upper_topkstatic) {
             if (X.getUtils() >= minUtility_lower) {
                 do {
@@ -994,6 +1048,13 @@ public class AlgoTKINC {
     private int compareItemsByRank(int item1, int item2) {
         int compare = mapItemToRank.get(item1) - mapItemToRank.get(item2);
         return (compare == 0) ? item1 - item2 : compare;
+    }
+
+    public void printTrie() {
+        System.out.println("==== trie ====");
+        // call a recursive helper method to print the trie in a depth-first search way starting
+        // with the childs of the root node.
+        printTrie(singleItemsNodes, "");
     }
 
 

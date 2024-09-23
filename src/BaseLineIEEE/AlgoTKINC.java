@@ -109,7 +109,6 @@ public class AlgoTKINC {
 	public AlgoTKINC() {
 
 	}
-	int tid;
 
 	String inputFile;
 	boolean firstTime;
@@ -150,7 +149,6 @@ public class AlgoTKINC {
 			mapLeafMAP = new HashMap<Integer, Map<Integer, Long>>();
 
 		}
-		tid = firstLine;
 		minUtility = 0;
 		leafPruneUtils = new PriorityQueue<Long>();
 		startTimestamp = System.currentTimeMillis();
@@ -161,8 +159,9 @@ public class AlgoTKINC {
 		kPatterns = new PriorityQueue<>();
 		huiCount = 0 ;
 		try {
+			int tid = 1;
 			myInput = new BufferedReader(new InputStreamReader(new FileInputStream(new File(input))));
-			while ((thisLine = myInput.readLine()) != null&&tid<lastLine) {
+			while ((thisLine = myInput.readLine()) != null&&tid<=lastLine) {
 				if(tid>=firstLine){
 					if (thisLine.isEmpty() == true || thisLine.charAt(0) == '#' || thisLine.charAt(0) == '%'
 							|| thisLine.charAt(0) == '@') {
@@ -194,8 +193,8 @@ public class AlgoTKINC {
 						mapItemToTWU.put(item, twu);
 						mapItemToUtility.put(item, sumUtil);
 					}
-					tid++;
 				}
+				tid++;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -265,7 +264,7 @@ public class AlgoTKINC {
 			}
 		}
 		Collections.sort(listOfPromisingUtilityLists, new UtilComparator());
-		int arrayRu[] = new int[tid + 1];
+		int arrayRu[] = new int[lastLine + 1];
 		for (int i = listOfPromisingUtilityLists.size() - 1; i >= 0; i--) {
 			UtilityList ul = listOfPromisingUtilityLists.get(i);
 			int newRemain = 0;

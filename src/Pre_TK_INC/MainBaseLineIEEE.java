@@ -9,22 +9,22 @@ public class MainBaseLineIEEE {
 
 	public static void main(String[] arg) throws IOException {
 
-		String input ="retail.txt";
+		String input ="fruithut.txt";
 		String output = "output.txt";
-		int upper_k = 7000;
-		int lower_k = 5000;
-		for (int l = 0; l < 1; l++) {
+		int upper_k = 6000;
+		int lower_k = 50;
+		for (int l = 0; l < 5; l++) {
 			System.out.println("upper_k: "+upper_k);
 			System.out.println("lower_k: "+lower_k);
 			// the number of updates to be performed
-			int numberOfUpdates = 9;
+			int numberOfUpdates = 10;
 
 			// scan the database to count the number of lines
 			// for our test purpose
 			int linecount = countLines(input);
 			int firstLine = 0;// ;
-			int lastLine = firstLine + (int) (linecount * 0.998f);
-			double addedratio = 0.002d / ((double) numberOfUpdates);
+			int lastLine = firstLine + (int) (linecount * 0.99f);
+			double addedratio = 0.01d / ((double) numberOfUpdates);
 			int linesForeEachUpdate = (int) (addedratio * linecount);
 
 			System.gc();
@@ -49,8 +49,8 @@ public class MainBaseLineIEEE {
 				lastLine = firstLine+linesForeEachUpdate;
 
 			}
-			upper_k -= 500;
-			lower_k -= 500;
+			upper_k -= 1000;
+			lower_k -= 50;
 
 		}
 	}
