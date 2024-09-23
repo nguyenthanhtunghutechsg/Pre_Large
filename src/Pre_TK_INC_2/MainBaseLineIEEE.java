@@ -1,4 +1,4 @@
-package Pre_TK_INC;
+package Pre_TK_INC_2;
 
 
 import java.io.FileReader;
@@ -50,7 +50,7 @@ public class MainBaseLineIEEE {
 
 			}
 			upper_k -= 1000;
-			lower_k -= 50;
+			lower_k -= 10;
 
 		}
 	}
